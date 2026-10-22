@@ -41,12 +41,19 @@ export function leerExcel(archivo: File): Promise<ExcelLeido> {
  */
 type CampoMapeado = keyof Omit<MapeoColumnasExcel, 'filtroBodegas' | 'filtroTiposProducto' | 'tipoProducto'>
 
-const PISTAS: Record<CampoMapeado, string[]> = {
+// "disponible"/"saldo_disponible" solo sirven como cantidad final cuando NO hay columna de
+// reserva separada: en ERPs que sí la traen (p. ej. SALDO_DISPONIBLE = SALDO_ACTUAL - RESERVA ya
+// calculado por el ERP), usar esa columna A LA VEZ que se resta "reserva" de nuevo duplica la
+// resta. Por eso hay dos listas: una para cuando sí hay reserva (prioriza el saldo bruto) y otra
+// para cuando no (prioriza el ya-neto).
+const PISTAS_CANTIDAD_SIN_RESERVA = ['disponible', 'saldo_disponible', 'cantidad', 'stock', 'existencia', 'saldo']
+const PISTAS_CANTIDAD_CON_RESERVA = ['saldo_actual', 'actual', 'cantidad', 'stock', 'existencia', 'saldo', 'disponible']
+
+const PISTAS: Record<Exclude<CampoMapeado, 'cantidadDisponible'>, string[]> = {
   referencia: ['referencia', 'codigo', 'código', 'sku', 'item', 'cod'],
   // "descripcion" va primero: en ERPs reales "producto" también aparece dentro de
   // CODIGO_PRODUCTO/GRUPO_PRODUCTO, que no son el nombre del producto.
   producto: ['descripcion', 'descripción', 'producto', 'nombre', 'articulo', 'artículo'],
-  cantidadDisponible: ['disponible', 'saldo_disponible', 'cantidad', 'stock', 'existencia', 'saldo'],
   bodega: ['bodega', 'almacen', 'almacén', 'deposito', 'depósito'],
   unidad: ['unidad', 'um', 'u.m', 'medida'],
   // Exacto "reserva" (no "reservado_2" ni variantes) para no toparse con otras columnas que
@@ -58,26 +65,39 @@ const PISTAS: Record<CampoMapeado, string[]> = {
 /** Términos que marcan una columna como propia de la bodega (metadato), no del producto. */
 const PISTAS_BODEGA = PISTAS.bodega
 
+function candidatosPara(campo: CampoMapeado, encabezados: string[]): string[] {
+  // Para cualquier campo que no sea "bodega", se descartan primero los encabezados que
+  // suenan a dato de bodega (p. ej. "CODIGO_BODEGA" no debe ganarle a "CODIGO_PRODUCTO"
+  // como referencia). Si eso deja la lista vacía, se usan todos igual.
+  if (campo === 'bodega') return encabezados
+  const sinBodega = encabezados.filter((enc) => !PISTAS_BODEGA.some((p) => enc.toLowerCase().includes(p)))
+  return sinBodega.length > 0 ? sinBodega : encabezados
+}
+
+function primeraCoincidencia(pistas: string[], lista: string[]): string | undefined {
+  for (const pista of pistas) {
+    const encontrado = lista.find((enc) => enc.toLowerCase().includes(pista))
+    if (encontrado) return encontrado
+  }
+  return undefined
+}
+
 /** Sugiere automáticamente el mapeo de columnas a partir de los encabezados reales del Excel. */
 export function sugerirMapeo(encabezados: string[]): Partial<MapeoColumnasExcel> {
   const sugerido: Partial<MapeoColumnasExcel> = {}
-  for (const campo of Object.keys(PISTAS) as CampoMapeado[]) {
-    const pistas = PISTAS[campo]
-    // Para cualquier campo que no sea "bodega", se descartan primero los encabezados que
-    // suenan a dato de bodega (p. ej. "CODIGO_BODEGA" no debe ganarle a "CODIGO_PRODUCTO"
-    // como referencia). Si eso deja la lista vacía, se usan todos igual.
-    const candidatos =
-      campo === 'bodega'
-        ? encabezados
-        : encabezados.filter((enc) => !PISTAS_BODEGA.some((p) => enc.toLowerCase().includes(p)))
-    const lista = candidatos.length > 0 ? candidatos : encabezados
-
-    let encontrado: string | undefined
-    for (const pista of pistas) {
-      encontrado = lista.find((enc) => enc.toLowerCase().includes(pista))
-      if (encontrado) break
-    }
+  for (const campo of Object.keys(PISTAS) as Exclude<CampoMapeado, 'cantidadDisponible'>[]) {
+    const encontrado = primeraCoincidencia(PISTAS[campo], candidatosPara(campo, encabezados))
     if (encontrado) sugerido[campo] = encontrado
   }
+
+  // cantidadDisponible se resuelve al final porque su lista de pistas depende de si ya se
+  // encontró columnaReserva arriba.
+  const pistasCantidad = sugerido.columnaReserva ? PISTAS_CANTIDAD_CON_RESERVA : PISTAS_CANTIDAD_SIN_RESERVA
+  const candidatosCantidad = candidatosPara('cantidadDisponible', encabezados).filter(
+    (enc) => enc !== sugerido.columnaReserva
+  )
+  const cantidadDisponible = primeraCoincidencia(pistasCantidad, candidatosCantidad)
+  if (cantidadDisponible) sugerido.cantidadDisponible = cantidadDisponible
+
   return sugerido
 }
