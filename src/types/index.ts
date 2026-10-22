@@ -20,11 +20,19 @@ export interface StockItem {
   referencia: string
   referenciaOriginal: string
   producto: string
+  /** Lista de códigos de bodega separados por coma (ej. "02, T1") cuando se sumó entre sedes. */
   bodega: string
   unidad: string
+  /** Total combinado entre todas las bodegas incluidas — es lo único que descuenta el despacho. */
   cantidadDisponible: number
   estado: EstadoStock
   motivoVerificar?: string
+  /**
+   * Desglose informativo de cuánto hay en cada bodega individual, tal como venía en la última
+   * carga del Excel. Solo para mostrar/filtrar en pantalla — el despacho siempre descuenta del
+   * total combinado (`cantidadDisponible`), porque Teo no controla reservas por bodega.
+   */
+  porBodega?: Record<string, { cantidad: number; estado: EstadoStock }>
   ultimaActualizacion?: unknown
   actualizadoPorExcelId?: string
 }

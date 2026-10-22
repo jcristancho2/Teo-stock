@@ -173,6 +173,7 @@ export function UploadExcelForm() {
         estado: 'ok' | 'por_verificar'
         motivo?: string
         bodegas: Set<string>
+        porBodega: Record<string, { cantidad: number; estado: 'ok' | 'por_verificar' }>
       }
       const acumulados = new Map<string, Acumulado>()
 
@@ -213,6 +214,7 @@ export function UploadExcelForm() {
             estado,
             motivo,
             bodegas: new Set(bodegaValor ? [bodegaValor] : []),
+            porBodega: bodegaValor ? { [bodegaValor]: { cantidad, estado } } : {},
           })
         } else {
           // Misma referencia en más de una bodega filtrada: se suma la cantidad disponible
@@ -223,7 +225,15 @@ export function UploadExcelForm() {
             existente.estado = 'por_verificar'
             existente.motivo = existente.motivo ?? motivo ?? 'Dato inconsistente entre bodegas'
           }
-          if (bodegaValor) existente.bodegas.add(bodegaValor)
+          if (bodegaValor) {
+            existente.bodegas.add(bodegaValor)
+            // Normalmente una sola fila por producto y bodega, pero se suma por si acaso.
+            const previo = existente.porBodega[bodegaValor]
+            existente.porBodega[bodegaValor] = {
+              cantidad: (previo?.cantidad ?? 0) + cantidad,
+              estado: previo?.estado === 'por_verificar' || estado === 'por_verificar' ? 'por_verificar' : 'ok',
+            }
+          }
         }
       }
 
@@ -254,6 +264,7 @@ export function UploadExcelForm() {
             cantidadDisponible: info.cantidad,
             estado: info.estado,
             motivoVerificar: info.motivo ?? null,
+            porBodega: info.porBodega,
             ultimaActualizacion: serverTimestamp(),
           },
         })

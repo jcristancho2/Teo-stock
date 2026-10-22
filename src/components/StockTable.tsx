@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { db } from '../firebase/config'
-import type { StockItem } from '../types'
+import type { EstadoStock, StockItem } from '../types'
 import { interpretarDisponibilidad } from '../utils/interpretarDisponibilidad'
 import { DispatchForm } from './DispatchForm'
 
@@ -17,6 +17,27 @@ function bodegasDe(bodega: string): string[] {
     .split(',')
     .map((b) => b.trim())
     .filter(Boolean)
+}
+
+/**
+ * Cuando hay bodegas filtradas, muestra solo lo que hay en esas bodegas (texto y cantidad) en
+ * vez del total combinado entre todas. El despacho real sigue descontando del total — Teo no
+ * reserva stock por bodega — por eso no se usa esto para habilitar/deshabilitar "Despachar".
+ */
+function vistaFiltrada(item: StockItem, bodegasActivas: string[]) {
+  if (bodegasActivas.length === 0 || !item.porBodega) {
+    return { bodegaTexto: item.bodega, cantidad: item.cantidadDisponible, estado: item.estado }
+  }
+  const incluidas = bodegasDe(item.bodega).filter((b) => bodegasActivas.includes(b))
+  let cantidad = 0
+  let estado: EstadoStock = 'ok'
+  for (const b of incluidas) {
+    const info = item.porBodega[b]
+    if (!info) continue
+    cantidad += info.cantidad
+    if (info.estado === 'por_verificar') estado = 'por_verificar'
+  }
+  return { bodegaTexto: incluidas.join(', ') || item.bodega, cantidad, estado }
 }
 
 export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
@@ -141,6 +162,12 @@ export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
               </button>
             ))}
           </div>
+          {bodegasActivas.length > 0 && (
+            <p className="texto-ayuda">
+              Mostrando solo lo que hay en {bodegasActivas.join(', ')}. El despacho siempre
+              descuenta del total combinado entre todas las bodegas.
+            </p>
+          )}
         </div>
       )}
 
@@ -166,19 +193,21 @@ export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
             <tbody>
               {filtrados.map((item) => {
                 const disp = interpretarDisponibilidad(item)
+                const vista = vistaFiltrada(item, bodegasActivas)
+                const dispVista = interpretarDisponibilidad({ ...item, cantidadDisponible: vista.cantidad, estado: vista.estado })
                 return (
                   <tr key={item.referencia}>
                     <td>{item.referenciaOriginal || item.referencia}</td>
                     <td>{item.producto}</td>
-                    <td>{item.bodega || '—'}</td>
+                    <td>{vista.bodegaTexto || '—'}</td>
                     <td>
-                      {item.cantidadDisponible} {item.unidad}
+                      {vista.cantidad} {item.unidad}
                     </td>
                     <td>
-                      <span className={`insignia insignia-${disp.tipo}`} title={disp.mensaje}>
-                        {disp.tipo === 'disponible' && 'Disponible'}
-                        {disp.tipo === 'sin_stock' && 'Sin stock — producir'}
-                        {disp.tipo === 'por_verificar' && 'Por verificar'}
+                      <span className={`insignia insignia-${dispVista.tipo}`} title={dispVista.mensaje}>
+                        {dispVista.tipo === 'disponible' && 'Disponible'}
+                        {dispVista.tipo === 'sin_stock' && 'Sin stock — producir'}
+                        {dispVista.tipo === 'por_verificar' && 'Por verificar'}
                       </span>
                     </td>
                     {permiteDespacho && (
@@ -186,6 +215,11 @@ export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
                         <button
                           className="boton-pequeno"
                           disabled={disp.tipo !== 'disponible'}
+                          title={
+                            bodegasActivas.length > 0
+                              ? 'El despacho siempre descuenta del total combinado entre bodegas, no solo de esta.'
+                              : undefined
+                          }
                           onClick={() => setItemADespachar(item)}
                         >
                           Despachar
