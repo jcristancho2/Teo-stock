@@ -113,9 +113,10 @@ h3 {
 .tarjeta {
   background: var(--color-tarjeta);
   border: 1px solid var(--color-borde);
-  border-radius: var(--radio);
+  border-radius: 14px;
   padding: 1.25rem 1.5rem;
   margin-bottom: 1.25rem;
+  box-shadow: 0 1px 2px rgba(20, 22, 30, 0.04), 0 4px 16px rgba(20, 22, 30, 0.05);
 }
 
 .tarjeta-login {
@@ -152,7 +153,8 @@ input,
 select {
   padding: 0.5rem 0.65rem;
   border: 1px solid var(--color-borde);
-  border-radius: 6px;
+  border-radius: 8px;
+  background: var(--color-tarjeta);
   color: var(--color-texto);
 }
 
@@ -160,8 +162,9 @@ button {
   background: var(--color-primario);
   color: white;
   border: none;
-  border-radius: 6px;
-  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  padding: 0.6rem 1.1rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -182,6 +185,30 @@ button:disabled {
 
 .boton-secundario:hover:not(:disabled) {
   background: var(--color-fondo);
+}
+
+.boton-peligro {
+  background: var(--color-alerta);
+}
+
+.boton-peligro:hover:not(:disabled) {
+  background: #8f1e18;
+}
+
+.aviso-eliminar {
+  border: 1px solid var(--bg-sin_stock);
+  background: var(--bg-sin_stock);
+  border-radius: var(--radio);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.fila-confirmar-borrado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
 }
 
 .boton-pequeno {
@@ -305,6 +332,11 @@ button:disabled {
 
 .buscador {
   width: 280px;
+  border-radius: 999px;
+  padding-left: 2.25rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b6f7a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 0.8rem center;
 }
 
 .grupo-filtro {
@@ -381,26 +413,32 @@ button:disabled {
 }
 
 .insignia {
-  display: inline-block;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-texto);
 }
 
-.insignia-disponible {
-  background: var(--bg-disponible);
-  color: var(--color-ok);
+.insignia::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
-.insignia-sin_stock {
-  background: var(--bg-sin_stock);
-  color: var(--color-alerta);
+.insignia-disponible::before {
+  background: var(--color-ok);
 }
 
-.insignia-por_verificar {
-  background: var(--bg-por_verificar);
-  color: var(--color-advertencia);
+.insignia-sin_stock::before {
+  background: var(--color-alerta);
+}
+
+.insignia-por_verificar::before {
+  background: var(--color-advertencia);
 }
 
 .tarjetas-resumen {
@@ -590,6 +628,62 @@ button:disabled {
 
   .tarjeta {
     padding: 1rem;
+  }
+
+  /* La tabla se convierte en una lista de tarjetas, una por fila, en vez de
+     scroll horizontal — así se ve como el catálogo del mockup en móvil. */
+  .tabla-contenedor {
+    overflow-x: visible;
+  }
+
+  .tabla {
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0 0.6rem;
+  }
+
+  .tabla thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .tabla tr {
+    display: block;
+    background: var(--color-tarjeta);
+    border: 1px solid var(--color-borde);
+    border-radius: 12px;
+    padding: 0.75rem 0.9rem;
+    box-shadow: 0 1px 2px rgba(20, 22, 30, 0.04);
+  }
+
+  .tabla td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    padding: 0.4rem 0;
+    border-bottom: none;
+    text-align: left;
+    word-break: break-word;
+  }
+
+  .tabla td[data-etiqueta]::before {
+    content: attr(data-etiqueta);
+    color: var(--color-texto-suave);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .tabla td:not([data-etiqueta]) {
+    padding-top: 0.6rem;
+  }
+
+  .tabla td:not([data-etiqueta]) button {
+    width: 100%;
   }
 }
 

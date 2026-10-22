@@ -208,10 +208,10 @@ export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
                 const dispVista = interpretarDisponibilidad({ ...item, cantidadDisponible: vista.cantidad, estado: vista.estado })
                 return (
                   <tr key={item.referencia}>
-                    <td>{item.referenciaOriginal || item.referencia}</td>
-                    <td>{item.producto}</td>
-                    <td>{vista.bodegaTexto || '—'}</td>
-                    <td>
+                    <td data-etiqueta="Referencia">{item.referenciaOriginal || item.referencia}</td>
+                    <td data-etiqueta="Producto">{item.producto}</td>
+                    <td data-etiqueta="Bodega">{vista.bodegaTexto || '—'}</td>
+                    <td data-etiqueta="Disponible">
                       {vista.sinDesglose ? (
                         <span title="Esta referencia se cargó antes de que se guardara la cantidad por bodega. Vuelve a cargar el Excel para verla.">
                           — (recarga el Excel)
@@ -222,7 +222,7 @@ export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
                         </>
                       )}
                     </td>
-                    <td>
+                    <td data-etiqueta="Estado">
                       {vista.sinDesglose ? (
                         <span className="insignia insignia-por_verificar">Sin desglose</span>
                       ) : (

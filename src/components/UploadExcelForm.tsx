@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   collection,
   doc,
+  getCountFromServer,
   getDoc,
+  getDocs,
   serverTimestamp,
   setDoc,
   writeBatch,
@@ -81,6 +83,36 @@ export function UploadExcelForm() {
     omitidasPorBodega: number
     omitidasPorTipo: number
   } | null>(null)
+  const [conteoStock, setConteoStock] = useState<number | null>(null)
+  const [confirmarBorrado, setConfirmarBorrado] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
+
+  useEffect(() => {
+    if (paso !== 'elegir_archivo') return
+    getCountFromServer(collection(db, 'stock'))
+      .then((snap) => setConteoStock(snap.data().count))
+      .catch(() => setConteoStock(null))
+  }, [paso])
+
+  async function eliminarStockActual() {
+    setEliminando(true)
+    setError(null)
+    try {
+      const snap = await getDocs(collection(db, 'stock'))
+      const refs = snap.docs.map((d) => d.ref)
+      for (let i = 0; i < refs.length; i += 450) {
+        const lote = writeBatch(db)
+        for (const ref of refs.slice(i, i + 450)) lote.delete(ref)
+        await lote.commit()
+      }
+      setConteoStock(0)
+      setConfirmarBorrado(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar el stock actual.')
+    } finally {
+      setEliminando(false)
+    }
+  }
 
   async function onArchivoSeleccionado(archivo: File) {
     setError(null)
@@ -321,17 +353,60 @@ export function UploadExcelForm() {
       {error && <p className="texto-error">{error}</p>}
 
       {paso === 'elegir_archivo' && (
-        <label className="boton-archivo">
-          Seleccionar archivo (.xlsx, .xls)
-          <input
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={(e) => {
-              const archivo = e.target.files?.[0]
-              if (archivo) onArchivoSeleccionado(archivo)
-            }}
-          />
-        </label>
+        <>
+          {conteoStock !== null && conteoStock > 0 && (
+            <div className="aviso-eliminar">
+              <p className="texto-ayuda">
+                Hay {conteoStock} referencias cargadas ahora mismo. Si el Excel nuevo trae menos
+                referencias que el anterior (productos descontinuados), las que falten no se
+                borran solas al cargar — elimina el stock actual primero si quieres partir de cero.
+              </p>
+              {!confirmarBorrado ? (
+                <button
+                  type="button"
+                  className="boton-secundario boton-pequeno"
+                  onClick={() => setConfirmarBorrado(true)}
+                >
+                  Eliminar stock actual
+                </button>
+              ) : (
+                <div className="fila-confirmar-borrado">
+                  <span className="texto-error">
+                    ¿Seguro? Esto borra las {conteoStock} referencias actuales y no se puede
+                    deshacer.
+                  </span>
+                  <button
+                    type="button"
+                    className="boton-secundario boton-pequeno"
+                    onClick={() => setConfirmarBorrado(false)}
+                    disabled={eliminando}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="boton-peligro boton-pequeno"
+                    onClick={eliminarStockActual}
+                    disabled={eliminando}
+                  >
+                    {eliminando ? 'Eliminando…' : 'Sí, eliminar todo'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          <label className="boton-archivo">
+            Seleccionar archivo (.xlsx, .xls)
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={(e) => {
+                const archivo = e.target.files?.[0]
+                if (archivo) onArchivoSeleccionado(archivo)
+              }}
+            />
+          </label>
+        </>
       )}
 
       {paso === 'mapear' && (

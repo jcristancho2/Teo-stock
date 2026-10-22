@@ -42,15 +42,15 @@ export function HistorialMovimientos() {
             <tbody>
               {movimientos.map((m) => (
                 <tr key={m.id}>
-                  <td>{formatearFecha(m.fecha)}</td>
-                  <td>{m.referencia}</td>
-                  <td>{m.producto}</td>
-                  <td>{m.cantidadDespachada}</td>
-                  <td>
+                  <td data-etiqueta="Fecha">{formatearFecha(m.fecha)}</td>
+                  <td data-etiqueta="Referencia">{m.referencia}</td>
+                  <td data-etiqueta="Producto">{m.producto}</td>
+                  <td data-etiqueta="Despachado">{m.cantidadDespachada}</td>
+                  <td data-etiqueta="Antes → Después">
                     {m.cantidadAntes} → {m.cantidadDespues}
                   </td>
-                  <td>{m.usuarioNombre}</td>
-                  <td>{m.cliente || '—'}</td>
+                  <td data-etiqueta="Usuario">{m.usuarioNombre}</td>
+                  <td data-etiqueta="Cliente">{m.cliente || '—'}</td>
                 </tr>
               ))}
             </tbody>

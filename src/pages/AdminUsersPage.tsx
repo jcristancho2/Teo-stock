@@ -103,15 +103,15 @@ export function AdminUsersPage() {
             <tbody>
               {usuarios.map((u) => (
                 <tr key={u.uid}>
-                  <td>{u.nombre}</td>
-                  <td>{u.email}</td>
-                  <td>
+                  <td data-etiqueta="Nombre">{u.nombre}</td>
+                  <td data-etiqueta="Correo">{u.email}</td>
+                  <td data-etiqueta="Rol">
                     <select value={u.rol} onChange={(e) => cambiarRol(u, e.target.value as Rol)}>
                       <option value="comercial">Comercial</option>
                       <option value="admin">Administrador</option>
                     </select>
                   </td>
-                  <td>{u.activo ? 'Activo' : 'Desactivado'}</td>
+                  <td data-etiqueta="Estado">{u.activo ? 'Activo' : 'Desactivado'}</td>
                   <td>
                     <button className="boton-secundario boton-pequeno" onClick={() => alternarActivo(u)}>
                       {u.activo ? 'Desactivar' : 'Activar'}

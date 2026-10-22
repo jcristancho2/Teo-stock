@@ -21,19 +21,19 @@ service cloud.firestore {
     }
 
     // Inventario cargado desde el Excel diario. Todo el equipo comercial lo
-    // lee; solo el admin puede crear o sobrescribir referencias (carga de
-    // Excel — cada carga reemplaza los valores de referencias que ya
-    // existen, por eso update también debe estar permitido, no solo
-    // create). La resta por despacho NO pasa por aquí de todos modos: la
-    // hace la Cloud Function `registrarDespacho` con el Admin SDK, que
-    // escribe sin pasar por estas reglas sin importar lo que digan — por
-    // eso permitir update al admin no abre ninguna puerta a saltarse la
-    // transacción atómica del despacho. Delete sí queda bloqueado: una
-    // referencia se reemplaza, nunca se borra desde el cliente.
+    // lee; solo el admin puede crear, sobrescribir o borrar referencias.
+    // Update además de create: cada carga reemplaza los valores de
+    // referencias que ya existen. Delete: el admin puede limpiar el stock
+    // actual antes de subir un Excel nuevo (referencias que ya no existen
+    // en el sistema quedarían obsoletas para siempre si no se pudiera). La
+    // resta por despacho NO pasa por aquí de todos modos: la hace la Cloud
+    // Function `registrarDespacho` con el Admin SDK, que escribe sin pasar
+    // por estas reglas sin importar lo que digan — por eso darle al admin
+    // create/update/delete aquí no abre ninguna puerta a saltarse la
+    // transacción atómica del despacho.
     match /stock/{referenciaId} {
       allow read: if esComercialOAdmin();
-      allow create, update: if esAdmin();
-      allow delete: if false;
+      allow create, update, delete: if esAdmin();
     }
 
     // Registro de cada archivo cargado (para trazabilidad). Solo lectura
