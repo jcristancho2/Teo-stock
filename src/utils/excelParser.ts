@@ -49,6 +49,10 @@ const PISTAS: Record<CampoMapeado, string[]> = {
   cantidadDisponible: ['disponible', 'saldo_disponible', 'cantidad', 'stock', 'existencia', 'saldo'],
   bodega: ['bodega', 'almacen', 'almacén', 'deposito', 'depósito'],
   unidad: ['unidad', 'um', 'u.m', 'medida'],
+  // Exacto "reserva" (no "reservado_2" ni variantes) para no toparse con otras columnas que
+  // solo mencionan la palabra de pasada — esto solo se usa para precargar la sugerencia; el
+  // admin la confirma o la borra en la pantalla de mapeo antes de que se use.
+  columnaReserva: ['reserva'],
 }
 
 /** Términos que marcan una columna como propia de la bodega (metadato), no del producto. */

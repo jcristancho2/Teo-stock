@@ -33,6 +33,31 @@ export function validarCantidad(valorCrudo: unknown): ResultadoValidacion {
   return { cantidad: numero, estado: 'ok' }
 }
 
+/**
+ * Calcula la cantidad disponible real como `saldoActual - reserva`, para ERPs donde el saldo
+ * "disponible" que publican no descuenta bien lo ya comprometido con otros pedidos. Si
+ * cualquiera de los dos valores es dudoso, o la reserva supera el saldo actual, el resultado
+ * también queda "por verificar" — nunca se inventa un número a partir de datos malos.
+ */
+export function calcularDisponibleConReserva(saldoActualCrudo: unknown, reservaCrudo: unknown): ResultadoValidacion {
+  const actual = validarCantidad(saldoActualCrudo)
+  if (actual.estado === 'por_verificar') {
+    return { cantidad: 0, estado: 'por_verificar', motivo: `Saldo actual: ${actual.motivo}` }
+  }
+
+  const reserva = validarCantidad(reservaCrudo)
+  if (reserva.estado === 'por_verificar') {
+    return { cantidad: 0, estado: 'por_verificar', motivo: `Reserva: ${reserva.motivo}` }
+  }
+
+  const cantidad = actual.cantidad - reserva.cantidad
+  if (cantidad < 0) {
+    return { cantidad, estado: 'por_verificar', motivo: 'La reserva es mayor que el saldo actual' }
+  }
+
+  return { cantidad, estado: 'ok' }
+}
+
 /** Normaliza una referencia para usarla como id de documento estable (misma referencia = mismo doc cada día). */
 export function normalizarReferencia(valor: unknown): string {
   return String(valor ?? '')

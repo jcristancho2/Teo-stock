@@ -64,13 +64,26 @@ export interface ExcelUploadLog {
 
 /** Mapeo de columnas del Excel real del sistema → campos de StockItem. Se guarda para reusarlo cada día. */
 export interface MapeoColumnasExcel {
+  /**
+   * Si `columnaReserva` NO está definida, esta es la columna que ya trae la cantidad
+   * disponible directa (p. ej. "SALDO_DISPONIBLE"). Si `columnaReserva` SÍ está definida,
+   * esta pasa a ser el "saldo actual" (bruto) y la cantidad disponible real se calcula como
+   * `cantidadDisponible - columnaReserva`.
+   */
+  cantidadDisponible: string
   referencia: string
   producto: string
-  cantidadDisponible: string
   bodega?: string
   unidad?: string
   /** Columna opcional con el tipo/categoría de producto (p. ej. "PRODUCTO TERMINADO TUBERIA"). */
   tipoProducto?: string
+  /**
+   * Columna opcional de "reserva" (stock ya comprometido con otros pedidos). Cuando se mapea,
+   * la cantidad disponible real se calcula como `cantidadDisponible - columnaReserva` en vez de
+   * leer `cantidadDisponible` directo — para ERPs donde el saldo disponible ya publicado no
+   * descuenta correctamente las reservas.
+   */
+  columnaReserva?: string
   /**
    * Si el Excel trae varias bodegas (una fila por código de producto y bodega), estos son los
    * valores de la columna `bodega` que cuentan como "disponible para el equipo comercial"

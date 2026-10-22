@@ -12,13 +12,12 @@ import {
 import { db } from '../firebase/config'
 import { useAuth } from '../context/AuthContext'
 import { leerExcel, sugerirMapeo, type FilaExcelCruda } from '../utils/excelParser'
-import { normalizarReferencia, validarCantidad } from '../utils/validarFila'
+import { calcularDisponibleConReserva, normalizarReferencia, validarCantidad } from '../utils/validarFila'
 import type { MapeoColumnasExcel } from '../types'
 
 const CAMPOS_OBLIGATORIOS: { clave: keyof MapeoColumnasExcel; etiqueta: string }[] = [
   { clave: 'referencia', etiqueta: 'Referencia / código' },
   { clave: 'producto', etiqueta: 'Producto / descripción' },
-  { clave: 'cantidadDisponible', etiqueta: 'Cantidad disponible' },
 ]
 const CAMPOS_OPCIONALES: { clave: keyof MapeoColumnasExcel; etiqueta: string }[] = [
   { clave: 'bodega', etiqueta: 'Bodega' },
@@ -132,7 +131,15 @@ export function UploadExcelForm() {
       const guardado = configGuardada.exists() ? (configGuardada.data() as MapeoColumnasExcel) : null
       const sugerido = sugerirMapeo(encabezados)
       const columnasGuardadas = guardado
-        ? [guardado.referencia, guardado.producto, guardado.cantidadDisponible, guardado.bodega, guardado.unidad, guardado.tipoProducto]
+        ? [
+            guardado.referencia,
+            guardado.producto,
+            guardado.cantidadDisponible,
+            guardado.bodega,
+            guardado.unidad,
+            guardado.tipoProducto,
+            guardado.columnaReserva,
+          ]
         : []
       const base =
         guardado && columnasGuardadas.every((v) => !v || encabezados.includes(v)) ? guardado : sugerido
@@ -178,6 +185,7 @@ export function UploadExcelForm() {
 
   function esMapeoCompleto(m: Partial<MapeoColumnasExcel>): m is MapeoColumnasExcel {
     if (!CAMPOS_OBLIGATORIOS.every((c) => !!m[c.clave])) return false
+    if (!m.cantidadDisponible) return false
     // Si hay más de una bodega en el Excel, elegir cuáles cuentan es obligatorio para no sumar
     // o pisar datos de bodegas que no son de disponibilidad comercial (materia prima, tránsito...).
     if (m.bodega && bodegasDetectadas.length > 1 && !(m.filtroBodegas && m.filtroBodegas.length > 0)) {
@@ -232,7 +240,9 @@ export function UploadExcelForm() {
         const referencia = normalizarReferencia(referenciaOriginal)
         if (!referencia) continue
 
-        const { cantidad, estado, motivo } = validarCantidad(fila[mapeoFinal.cantidadDisponible])
+        const { cantidad, estado, motivo } = mapeoFinal.columnaReserva
+          ? calcularDisponibleConReserva(fila[mapeoFinal.cantidadDisponible], fila[mapeoFinal.columnaReserva])
+          : validarCantidad(fila[mapeoFinal.cantidadDisponible])
         const bodegaValor = mapeoFinal.bodega ? String(fila[mapeoFinal.bodega] ?? '').trim() : ''
         const unidadValor = mapeoFinal.unidad ? String(fila[mapeoFinal.unidad] ?? '').trim() : ''
 
@@ -416,9 +426,63 @@ export function UploadExcelForm() {
             del Excel corresponde a cada dato (se recuerda para la próxima carga):
           </p>
 
-          {[...CAMPOS_OBLIGATORIOS, ...CAMPOS_OPCIONALES].map(({ clave, etiqueta }) => (
+          {CAMPOS_OBLIGATORIOS.map(({ clave, etiqueta }) => (
             <label key={clave} className="campo-mapeo">
-              {etiqueta} {CAMPOS_OBLIGATORIOS.some((c) => c.clave === clave) && <span className="obligatorio">*</span>}
+              {etiqueta} <span className="obligatorio">*</span>
+              <select
+                value={mapeo[clave] ?? ''}
+                onChange={(e) => setMapeo((m) => ({ ...m, [clave]: e.target.value || undefined }))}
+              >
+                <option value="">— No usar —</option>
+                {encabezados.map((enc) => (
+                  <option key={enc} value={enc}>
+                    {enc}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+
+          <label className="campo-mapeo">
+            {mapeo.columnaReserva ? 'Saldo actual (se le resta la reserva)' : 'Cantidad disponible'}{' '}
+            <span className="obligatorio">*</span>
+            <select
+              value={mapeo.cantidadDisponible ?? ''}
+              onChange={(e) => setMapeo((m) => ({ ...m, cantidadDisponible: e.target.value || undefined }))}
+            >
+              <option value="">— No usar —</option>
+              {encabezados.map((enc) => (
+                <option key={enc} value={enc}>
+                  {enc}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="campo-mapeo">
+            Columna de reserva (opcional)
+            <select
+              value={mapeo.columnaReserva ?? ''}
+              onChange={(e) => setMapeo((m) => ({ ...m, columnaReserva: e.target.value || undefined }))}
+            >
+              <option value="">— No restar reserva —</option>
+              {encabezados.map((enc) => (
+                <option key={enc} value={enc}>
+                  {enc}
+                </option>
+              ))}
+            </select>
+          </label>
+          {mapeo.columnaReserva && mapeo.cantidadDisponible && (
+            <p className="texto-ayuda">
+              La cantidad disponible real se calculará como "{mapeo.cantidadDisponible}" menos "
+              {mapeo.columnaReserva}" en cada fila.
+            </p>
+          )}
+
+          {CAMPOS_OPCIONALES.map(({ clave, etiqueta }) => (
+            <label key={clave} className="campo-mapeo">
+              {etiqueta}
               <select
                 value={mapeo[clave] ?? ''}
                 onChange={(e) => setMapeo((m) => ({ ...m, [clave]: e.target.value || undefined }))}
