@@ -4,8 +4,8 @@ title: Firestore rules and role model
 type: security
 status: current
 created: 2026-10-22
-updated: 2026-10-22
-last_verified_commit: n/a (no git repository initialized)
+updated: 2026-10-23
+last_verified_commit: dffbef2
 owners:
   - wiki-maintainer
 tags:
@@ -36,19 +36,30 @@ content for authorization).
 `esAdmin()` (`role == 'admin'`), `esComercialOAdmin()` (`role in
 ['comercial','admin']`). Per collection:
 
-| Collection | read | create | update/delete |
-|---|---|---|---|
-| `users/{userId}` | own doc or admin | admin only | admin only (write rule covers all) |
-| `stock/{ref}` | comercial or admin | admin only | **blocked for everyone** (`false`) |
-| `excelUploads/{id}` | comercial or admin | admin only | **blocked for everyone** |
-| `movimientos/{id}` | comercial or admin | **blocked for everyone** | **blocked for everyone** |
-| `config/{doc}` | admin only | — | admin only |
+| Collection | read | create | update | delete |
+|---|---|---|---|---|
+| `users/{userId}` | own doc or admin | admin only | admin only | admin only (write rule covers all) |
+| `stock/{ref}` | comercial or admin | admin only | admin only | **blocked for everyone** (`false`) |
+| `excelUploads/{id}` | comercial or admin | admin only | **blocked** | **blocked** |
+| `movimientos/{id}` | comercial or admin | **blocked for everyone** | **blocked** | **blocked** |
+| `config/{doc}` | admin only | — | admin only | admin only |
 
-The comments in `firestore.rules` state explicitly *why* `stock` update and
-`movimientos` create are both `false`: the only legitimate writer is the
-Cloud Functions Admin SDK (`registrarDespacho`), which is not subject to
-these rules at all — blocking the client path is what makes that guarantee
-hold.
+> [!CONTRADICTION]
+> The original `stock` rule set `update: false` on the theory that only the
+> Cloud Functions Admin SDK should ever change a stock doc. In practice the
+> admin's own daily Excel re-upload needs to **overwrite existing** stock
+> docs — a Firestore `set()` on a doc that already exists is an `update`,
+> not a `create` — so the original rule blocked the app's own core daily
+> workflow with `permission-denied` on every re-upload after the first.
+> Fixed 2026-10-23: `stock` now allows `update` for admin too. This does not
+> weaken the dispatch-atomicity guarantee — `registrarDespacho` writes via
+> the Admin SDK, which bypasses these rules regardless of what they say, so
+> comercial still has zero write path to `stock` either way.
+
+The comments in `firestore.rules` state why `movimientos` create is `false`
+for every client: the only legitimate writer is the Cloud Functions Admin
+SDK (`registrarDespacho`), not subject to these rules at all — blocking the
+client path is what makes that guarantee hold.
 
 ## Why claims, not the Firestore document
 
