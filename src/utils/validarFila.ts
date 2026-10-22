@@ -15,8 +15,12 @@ export function validarCantidad(valorCrudo: unknown): ResultadoValidacion {
     return { cantidad: 0, estado: 'por_verificar', motivo: 'Cantidad vacía en el Excel' }
   }
 
-  const texto = String(valorCrudo).trim().replace(/\./g, '').replace(',', '.')
-  const numero = Number(texto)
+  // Una celda numérica real de Excel llega como number de JS (ya en formato correcto,
+  // con punto decimal) — no se debe reformatear como si fuera texto en formato
+  // latino, o un valor como 208898.82374 se vuelve 20889882374 al quitarle el punto.
+  // Solo el texto (p. ej. "1.234,56" tecleado o pegado como texto) usa punto de miles.
+  const numero =
+    typeof valorCrudo === 'number' ? valorCrudo : Number(String(valorCrudo).trim().replace(/\./g, '').replace(',', '.'))
 
   if (!Number.isFinite(numero)) {
     return { cantidad: 0, estado: 'por_verificar', motivo: `Cantidad no numérica: "${valorCrudo}"` }

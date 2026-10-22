@@ -61,4 +61,15 @@ export interface MapeoColumnasExcel {
   cantidadDisponible: string
   bodega?: string
   unidad?: string
+  /** Columna opcional con el tipo/categoría de producto (p. ej. "PRODUCTO TERMINADO TUBERIA"). */
+  tipoProducto?: string
+  /**
+   * Si el Excel trae varias bodegas (una fila por código de producto y bodega), estos son los
+   * valores de la columna `bodega` que cuentan como "disponible para el equipo comercial"
+   * (p. ej. las bodegas de producto terminado en cada sede) — el resto se ignora. Cuando el
+   * mismo código de producto aparece en más de una de estas bodegas, sus cantidades se suman.
+   */
+  filtroBodegas?: string[]
+  /** Valores de `tipoProducto` que cuentan como vendibles (p. ej. excluir herramientas, equipos). */
+  filtroTiposProducto?: string[]
 }

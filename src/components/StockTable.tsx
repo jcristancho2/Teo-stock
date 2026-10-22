@@ -5,9 +5,25 @@ import type { StockItem } from '../types'
 import { interpretarDisponibilidad } from '../utils/interpretarDisponibilidad'
 import { DispatchForm } from './DispatchForm'
 
+/** Letras iniciales de la referencia (ej. "TU000741" → "TU"), la familia del producto en el ERP. */
+function prefijoDe(referencia: string): string {
+  return referencia.match(/^[A-Z]+/)?.[0] ?? '—'
+}
+
+/** El campo bodega puede traer varias separadas por coma (ej. "02, T1") cuando la cantidad
+ * disponible se sumó entre sedes al cargar el Excel — se listan por separado para filtrar. */
+function bodegasDe(bodega: string): string[] {
+  return bodega
+    .split(',')
+    .map((b) => b.trim())
+    .filter(Boolean)
+}
+
 export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
   const [items, setItems] = useState<StockItem[]>([])
   const [busqueda, setBusqueda] = useState('')
+  const [prefijosActivos, setPrefijosActivos] = useState<string[]>([])
+  const [bodegasActivas, setBodegasActivas] = useState<string[]>([])
   const [itemADespachar, setItemADespachar] = useState<StockItem | null>(null)
 
   useEffect(() => {
@@ -18,16 +34,52 @@ export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
     return unsub
   }, [])
 
+  const prefijosDisponibles = useMemo(() => {
+    const conteo = new Map<string, number>()
+    for (const it of items) {
+      const p = prefijoDe(it.referencia)
+      conteo.set(p, (conteo.get(p) ?? 0) + 1)
+    }
+    return Array.from(conteo.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+  }, [items])
+
+  const bodegasDisponibles = useMemo(() => {
+    const conteo = new Map<string, number>()
+    for (const it of items) {
+      for (const b of bodegasDe(it.bodega)) {
+        conteo.set(b, (conteo.get(b) ?? 0) + 1)
+      }
+    }
+    return Array.from(conteo.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+  }, [items])
+
+  function alternarPrefijo(prefijo: string) {
+    setPrefijosActivos((actuales) =>
+      actuales.includes(prefijo) ? actuales.filter((p) => p !== prefijo) : [...actuales, prefijo]
+    )
+  }
+
+  function alternarBodega(bodega: string) {
+    setBodegasActivas((actuales) =>
+      actuales.includes(bodega) ? actuales.filter((b) => b !== bodega) : [...actuales, bodega]
+    )
+  }
+
   const filtrados = useMemo(() => {
     const termino = busqueda.trim().toLowerCase()
-    if (!termino) return items
-    return items.filter(
-      (it) =>
+    return items.filter((it) => {
+      if (prefijosActivos.length > 0 && !prefijosActivos.includes(prefijoDe(it.referencia))) return false
+      if (bodegasActivas.length > 0 && !bodegasDe(it.bodega).some((b) => bodegasActivas.includes(b))) {
+        return false
+      }
+      if (!termino) return true
+      return (
         it.producto.toLowerCase().includes(termino) ||
         it.referencia.toLowerCase().includes(termino) ||
         (it.referenciaOriginal ?? '').toLowerCase().includes(termino)
-    )
-  }, [items, busqueda])
+      )
+    })
+  }, [items, busqueda, prefijosActivos, bodegasActivas])
 
   return (
     <div className="tarjeta">
@@ -42,10 +94,62 @@ export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
         />
       </div>
 
+      {prefijosDisponibles.length > 1 && (
+        <div className="grupo-filtro">
+          <span className="etiqueta-filtro">Familia</span>
+          <div className="chips-filtro">
+            <button
+              type="button"
+              className={`chip${prefijosActivos.length === 0 ? ' chip-activo' : ''}`}
+              onClick={() => setPrefijosActivos([])}
+            >
+              Todos
+            </button>
+            {prefijosDisponibles.map(([prefijo, cantidad]) => (
+              <button
+                key={prefijo}
+                type="button"
+                className={`chip${prefijosActivos.includes(prefijo) ? ' chip-activo' : ''}`}
+                onClick={() => alternarPrefijo(prefijo)}
+              >
+                {prefijo} <span className="chip-contador">{cantidad}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {bodegasDisponibles.length > 1 && (
+        <div className="grupo-filtro">
+          <span className="etiqueta-filtro">Bodega</span>
+          <div className="chips-filtro">
+            <button
+              type="button"
+              className={`chip${bodegasActivas.length === 0 ? ' chip-activo' : ''}`}
+              onClick={() => setBodegasActivas([])}
+            >
+              Todas
+            </button>
+            {bodegasDisponibles.map(([bodega, cantidad]) => (
+              <button
+                key={bodega}
+                type="button"
+                className={`chip${bodegasActivas.includes(bodega) ? ' chip-activo' : ''}`}
+                onClick={() => alternarBodega(bodega)}
+              >
+                {bodega} <span className="chip-contador">{cantidad}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {items.length === 0 ? (
         <p className="texto-ayuda">
           Todavía no hay ningún Excel cargado. Pide a un administrador que cargue el de hoy.
         </p>
+      ) : filtrados.length === 0 ? (
+        <p className="texto-ayuda">Ninguna referencia coincide con la búsqueda o el filtro.</p>
       ) : (
         <div className="tabla-contenedor">
           <table className="tabla">
