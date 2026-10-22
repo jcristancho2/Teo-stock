@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../context/AuthContext'
-import { leerExcel, sugerirMapeo, type FilaExcelCruda } from '../utils/excelParser'
+import { esColumnaDisponibleDirecta, leerExcel, sugerirMapeo, type FilaExcelCruda } from '../utils/excelParser'
 import { calcularDisponibleConReserva, normalizarReferencia, validarCantidad } from '../utils/validarFila'
 import type { MapeoColumnasExcel } from '../types'
 
@@ -141,8 +141,13 @@ export function UploadExcelForm() {
             guardado.columnaReserva,
           ]
         : []
-      const base =
-        guardado && columnasGuardadas.every((v) => !v || encabezados.includes(v)) ? guardado : sugerido
+      // Un mapeo guardado antes de este cambio pudo apuntar "cantidad disponible" a una columna
+      // "disponible" directa — esa ya no es válida, así que se descarta y se re-sugiere.
+      const guardadoValido =
+        guardado &&
+        columnasGuardadas.every((v) => !v || encabezados.includes(v)) &&
+        !esColumnaDisponibleDirecta(guardado.cantidadDisponible)
+      const base = guardadoValido ? guardado : sugerido
 
       setMapeo(base)
       setPaso('mapear')
@@ -451,11 +456,13 @@ export function UploadExcelForm() {
               onChange={(e) => setMapeo((m) => ({ ...m, cantidadDisponible: e.target.value || undefined }))}
             >
               <option value="">— No usar —</option>
-              {encabezados.map((enc) => (
-                <option key={enc} value={enc}>
-                  {enc}
-                </option>
-              ))}
+              {encabezados
+                .filter((enc) => !esColumnaDisponibleDirecta(enc))
+                .map((enc) => (
+                  <option key={enc} value={enc}>
+                    {enc}
+                  </option>
+                ))}
             </select>
           </label>
 
@@ -479,6 +486,10 @@ export function UploadExcelForm() {
               {mapeo.columnaReserva}" en cada fila.
             </p>
           )}
+          <p className="texto-ayuda">
+            Las columnas de "disponible"/"saldo disponible" del Excel no aparecen aquí a propósito:
+            Teo nunca lee ese dato directo, siempre lo recalcula con la fórmula de arriba.
+          </p>
 
           {CAMPOS_OPCIONALES.map(({ clave, etiqueta }) => (
             <label key={clave} className="campo-mapeo">

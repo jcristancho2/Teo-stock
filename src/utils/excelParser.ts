@@ -41,13 +41,18 @@ export function leerExcel(archivo: File): Promise<ExcelLeido> {
  */
 type CampoMapeado = keyof Omit<MapeoColumnasExcel, 'filtroBodegas' | 'filtroTiposProducto' | 'tipoProducto'>
 
-// "disponible"/"saldo_disponible" solo sirven como cantidad final cuando NO hay columna de
-// reserva separada: en ERPs que sí la traen (p. ej. SALDO_DISPONIBLE = SALDO_ACTUAL - RESERVA ya
-// calculado por el ERP), usar esa columna A LA VEZ que se resta "reserva" de nuevo duplica la
-// resta. Por eso hay dos listas: una para cuando sí hay reserva (prioriza el saldo bruto) y otra
-// para cuando no (prioriza el ya-neto).
-const PISTAS_CANTIDAD_SIN_RESERVA = ['disponible', 'saldo_disponible', 'cantidad', 'stock', 'existencia', 'saldo']
-const PISTAS_CANTIDAD_CON_RESERVA = ['saldo_actual', 'actual', 'cantidad', 'stock', 'existencia', 'saldo', 'disponible']
+/**
+ * Cualquier columna de "disponible"/"saldo_disponible" se descarta siempre como fuente de
+ * cantidad: en el ERP real viene ya calculada (SALDO_ACTUAL - RESERVA) pero se verificó contra
+ * un export real que 90/9263 filas quedan desactualizadas (no le restan la reserva). Teo nunca
+ * la lee directo — siempre recalcula con la fórmula a partir del saldo bruto y la reserva.
+ */
+export function esColumnaDisponibleDirecta(encabezado: string): boolean {
+  return encabezado.toLowerCase().includes('disponible')
+}
+
+const PISTAS_CANTIDAD_SIN_RESERVA = ['cantidad', 'stock', 'existencia', 'saldo']
+const PISTAS_CANTIDAD_CON_RESERVA = ['saldo_actual', 'actual', 'cantidad', 'stock', 'existencia', 'saldo']
 
 const PISTAS: Record<Exclude<CampoMapeado, 'cantidadDisponible'>, string[]> = {
   referencia: ['referencia', 'codigo', 'código', 'sku', 'item', 'cod'],
@@ -91,10 +96,10 @@ export function sugerirMapeo(encabezados: string[]): Partial<MapeoColumnasExcel>
   }
 
   // cantidadDisponible se resuelve al final porque su lista de pistas depende de si ya se
-  // encontró columnaReserva arriba.
+  // encontró columnaReserva arriba. Nunca se sugiere una columna "disponible" directa.
   const pistasCantidad = sugerido.columnaReserva ? PISTAS_CANTIDAD_CON_RESERVA : PISTAS_CANTIDAD_SIN_RESERVA
   const candidatosCantidad = candidatosPara('cantidadDisponible', encabezados).filter(
-    (enc) => enc !== sugerido.columnaReserva
+    (enc) => enc !== sugerido.columnaReserva && !esColumnaDisponibleDirecta(enc)
   )
   const cantidadDisponible = primeraCoincidencia(pistasCantidad, candidatosCantidad)
   if (cantidadDisponible) sugerido.cantidadDisponible = cantidadDisponible
