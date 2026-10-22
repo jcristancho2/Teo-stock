@@ -1,0 +1,8 @@
+{
+  "name": "teo-stock-scripts",
+  "private": true,
+  "description": "Scripts de administración que corren con Node fuera de la app (requieren una cuenta de servicio de Firebase).",
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}

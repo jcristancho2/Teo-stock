@@ -1,0 +1,9 @@
+<!-- BEGIN: Project Knowledge Protocol (managed by the llm-wiki skill) -->
+
+This repository keeps a verified knowledge map under wiki/. Before a non-trivial change: read wiki/index.md first, open only relevant pages, verify claims against the real code (code wins over the wiki when they disagree), and check wiki/decisions/ for relevant recorded decisions.
+
+After a change affecting behavior, architecture, an API, the data model, configuration, or security: update the relevant wiki/** pages with evidence-cited content (file paths, symbols, tests) — never invented. Skip for cosmetic/formatting-only changes.
+
+Full protocol: AGENTS.md at the repo root. Conventions: wiki/README.md.
+
+<!-- END: Project Knowledge Protocol (managed by the llm-wiki skill) -->

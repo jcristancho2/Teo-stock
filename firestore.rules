@@ -1,0 +1,55 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function estaAutenticado() {
+      return request.auth != null;
+    }
+    function esAdmin() {
+      return estaAutenticado() && request.auth.token.role == 'admin';
+    }
+    function esComercialOAdmin() {
+      return estaAutenticado() && (request.auth.token.role == 'comercial' || request.auth.token.role == 'admin');
+    }
+
+    // Perfiles de usuario (rol, nombre, activo). Cada persona puede leer el
+    // suyo; solo el admin puede leer todos y escribir cualquiera.
+    match /users/{userId} {
+      allow read: if estaAutenticado() && (request.auth.uid == userId || esAdmin());
+      allow write: if esAdmin();
+    }
+
+    // Inventario cargado desde el Excel diario. Todo el equipo comercial lo
+    // lee; solo el admin puede crear o sobrescribir referencias (carga de
+    // Excel). La resta por despacho NO pasa por aquí: la hace la Cloud
+    // Function `registrarDespacho` con el Admin SDK, que no está sujeto a
+    // estas reglas — por eso update/delete directos quedan bloqueados.
+    match /stock/{referenciaId} {
+      allow read: if esComercialOAdmin();
+      allow create: if esAdmin();
+      allow update, delete: if false;
+    }
+
+    // Registro de cada archivo cargado (para trazabilidad). Solo lectura
+    // para el equipo, escritura solo desde la carga de Excel del admin.
+    match /excelUploads/{uploadId} {
+      allow read: if esComercialOAdmin();
+      allow create: if esAdmin();
+      allow update, delete: if false;
+    }
+
+    // Histórico de despachos. Se lee en la app; se escribe únicamente desde
+    // la transacción de `registrarDespacho` (Admin SDK), nunca directo.
+    match /movimientos/{movId} {
+      allow read: if esComercialOAdmin();
+      allow create, update, delete: if false;
+    }
+
+    // Mapeo de columnas del Excel recordado entre cargas.
+    match /config/{docId} {
+      allow read: if esAdmin();
+      allow write: if esAdmin();
+    }
+  }
+}

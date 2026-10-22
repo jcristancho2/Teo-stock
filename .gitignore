@@ -1,0 +1,14 @@
+node_modules
+dist
+dev-dist
+.tsbuild-node
+.env
+.env.local
+functions/node_modules
+functions/lib
+service-account*.json
+*.log
+.firebase
+.DS_Store
+ADMIN_TEST_CREDENTIALS.local.txt
+firestore.rules.devtest

@@ -1,0 +1,14 @@
+# wiki/sources/manifest.yml
+# Tracks ingestion state for files under knowledge/raw/ without modifying the
+# originals. One entry per processed source.
+#
+# Fields:
+#   path:            path to the original file under knowledge/raw/
+#   hash:             sha256 of the file content at last processing
+#   processed_at:     ISO date of last ingestion
+#   source_page:      path to the wiki/sources/ page generated for it
+#   status:           pending | processed | superseded
+#   commit:           repo commit at time of processing
+#   affected_pages:   list of wiki pages updated because of this source
+
+sources: []

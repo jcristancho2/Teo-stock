@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 scripts/wiki/changed_files.py --json | python3 -c \"import json,sys; d=json.load(sys.stdin); files=d.get('substantive',[]); print('WIKI_SYNC_SUGGESTED' if files else 'WIKI_SYNC_NOT_NEEDED'); [print(' -', f) for f in files[:20]]\""
+          }
+        ]
+      }
+    ]
+  }
+}
