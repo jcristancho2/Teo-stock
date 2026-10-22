@@ -2,6 +2,9 @@ node_modules
 dist
 dev-dist
 .tsbuild-node
+*.tsbuildinfo
+*.d.ts.map
+vite.config.d.ts
 .env
 .env.local
 functions/node_modules
