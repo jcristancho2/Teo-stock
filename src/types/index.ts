@@ -28,11 +28,18 @@ export interface StockItem {
   estado: EstadoStock
   motivoVerificar?: string
   /**
+   * Saldo actual bruto y reserva combinados entre bodegas, solo presentes cuando el Excel traía
+   * columna de reserva — se guardan para poder mostrar la operación (actual - reserva =
+   * disponible) en pantalla. `cantidadDisponible` ya es el resultado, nunca se recalcula de esto.
+   */
+  saldoActual?: number
+  reserva?: number
+  /**
    * Desglose informativo de cuánto hay en cada bodega individual, tal como venía en la última
    * carga del Excel. Solo para mostrar/filtrar en pantalla — el despacho siempre descuenta del
    * total combinado (`cantidadDisponible`), porque Teo no controla reservas por bodega.
    */
-  porBodega?: Record<string, { cantidad: number; estado: EstadoStock }>
+  porBodega?: Record<string, { cantidad: number; estado: EstadoStock; saldoActual?: number; reserva?: number }>
   ultimaActualizacion?: unknown
   actualizadoPorExcelId?: string
 }

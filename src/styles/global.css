@@ -231,6 +231,12 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.detalle-operacion {
+  color: var(--color-texto-suave);
+  font-size: 0.78rem;
+  margin-top: 0.15rem;
+}
+
 .app-shell {
   display: flex;
   flex-direction: column;

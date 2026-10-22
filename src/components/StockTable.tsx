@@ -30,25 +30,36 @@ function bodegasDe(bodega: string): string[] {
  */
 function vistaFiltrada(item: StockItem, bodegasActivas: string[]) {
   if (bodegasActivas.length === 0) {
-    return { bodegaTexto: item.bodega, cantidad: item.cantidadDisponible, estado: item.estado, sinDesglose: false }
+    return {
+      bodegaTexto: item.bodega,
+      cantidad: item.cantidadDisponible,
+      estado: item.estado,
+      sinDesglose: false,
+      saldoActual: item.saldoActual,
+      reserva: item.reserva,
+    }
   }
 
   const incluidas = bodegasDe(item.bodega).filter((b) => bodegasActivas.includes(b))
   const bodegaTexto = incluidas.join(', ') || item.bodega
 
   if (!item.porBodega) {
-    return { bodegaTexto, cantidad: 0, estado: item.estado, sinDesglose: true }
+    return { bodegaTexto, cantidad: 0, estado: item.estado, sinDesglose: true, saldoActual: undefined, reserva: undefined }
   }
 
   let cantidad = 0
   let estado: EstadoStock = 'ok'
+  let saldoActual: number | undefined
+  let reserva: number | undefined
   for (const b of incluidas) {
     const info = item.porBodega[b]
     if (!info) continue
     cantidad += info.cantidad
     if (info.estado === 'por_verificar') estado = 'por_verificar'
+    if (info.saldoActual !== undefined) saldoActual = (saldoActual ?? 0) + info.saldoActual
+    if (info.reserva !== undefined) reserva = (reserva ?? 0) + info.reserva
   }
-  return { bodegaTexto, cantidad, estado, sinDesglose: false }
+  return { bodegaTexto, cantidad, estado, sinDesglose: false, saldoActual, reserva }
 }
 
 export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
@@ -219,6 +230,11 @@ export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
                       ) : (
                         <>
                           {vista.cantidad} {item.unidad}
+                          {vista.saldoActual !== undefined && vista.reserva !== undefined && (
+                            <div className="detalle-operacion">
+                              {vista.saldoActual} − {vista.reserva} = {vista.cantidad}
+                            </div>
+                          )}
                         </>
                       )}
                     </td>

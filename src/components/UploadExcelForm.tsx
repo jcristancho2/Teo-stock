@@ -218,7 +218,12 @@ export function UploadExcelForm() {
         estado: 'ok' | 'por_verificar'
         motivo?: string
         bodegas: Set<string>
-        porBodega: Record<string, { cantidad: number; estado: 'ok' | 'por_verificar' }>
+        saldoActual?: number
+        reserva?: number
+        porBodega: Record<
+          string,
+          { cantidad: number; estado: 'ok' | 'por_verificar'; saldoActual?: number; reserva?: number }
+        >
       }
       const acumulados = new Map<string, Acumulado>()
 
@@ -245,9 +250,22 @@ export function UploadExcelForm() {
         const referencia = normalizarReferencia(referenciaOriginal)
         if (!referencia) continue
 
-        const { cantidad, estado, motivo } = mapeoFinal.columnaReserva
-          ? calcularDisponibleConReserva(fila[mapeoFinal.cantidadDisponible], fila[mapeoFinal.columnaReserva])
-          : validarCantidad(fila[mapeoFinal.cantidadDisponible])
+        let cantidad: number, estado: 'ok' | 'por_verificar', motivo: string | undefined
+        let saldoActualFila: number | undefined
+        let reservaFila: number | undefined
+        if (mapeoFinal.columnaReserva) {
+          const r = calcularDisponibleConReserva(fila[mapeoFinal.cantidadDisponible], fila[mapeoFinal.columnaReserva])
+          cantidad = r.cantidad
+          estado = r.estado
+          motivo = r.motivo
+          saldoActualFila = r.saldoActual
+          reservaFila = r.reserva
+        } else {
+          const r = validarCantidad(fila[mapeoFinal.cantidadDisponible])
+          cantidad = r.cantidad
+          estado = r.estado
+          motivo = r.motivo
+        }
         const bodegaValor = mapeoFinal.bodega ? String(fila[mapeoFinal.bodega] ?? '').trim() : ''
         const unidadValor = mapeoFinal.unidad ? String(fila[mapeoFinal.unidad] ?? '').trim() : ''
 
@@ -261,13 +279,19 @@ export function UploadExcelForm() {
             estado,
             motivo,
             bodegas: new Set(bodegaValor ? [bodegaValor] : []),
-            porBodega: bodegaValor ? { [bodegaValor]: { cantidad, estado } } : {},
+            saldoActual: saldoActualFila,
+            reserva: reservaFila,
+            porBodega: bodegaValor
+              ? { [bodegaValor]: { cantidad, estado, saldoActual: saldoActualFila, reserva: reservaFila } }
+              : {},
           })
         } else {
           // Misma referencia en más de una bodega filtrada: se suma la cantidad disponible
           // entre sedes. Si cualquiera de las filas que la componen es dudosa, el total
           // también queda "por verificar" — nunca se promedia ni se ignora el dato malo.
           existente.cantidad += cantidad
+          if (saldoActualFila !== undefined) existente.saldoActual = (existente.saldoActual ?? 0) + saldoActualFila
+          if (reservaFila !== undefined) existente.reserva = (existente.reserva ?? 0) + reservaFila
           if (estado === 'por_verificar') {
             existente.estado = 'por_verificar'
             existente.motivo = existente.motivo ?? motivo ?? 'Dato inconsistente entre bodegas'
@@ -279,6 +303,9 @@ export function UploadExcelForm() {
             existente.porBodega[bodegaValor] = {
               cantidad: (previo?.cantidad ?? 0) + cantidad,
               estado: previo?.estado === 'por_verificar' || estado === 'por_verificar' ? 'por_verificar' : 'ok',
+              saldoActual:
+                saldoActualFila !== undefined ? (previo?.saldoActual ?? 0) + saldoActualFila : previo?.saldoActual,
+              reserva: reservaFila !== undefined ? (previo?.reserva ?? 0) + reservaFila : previo?.reserva,
             }
           }
         }
@@ -311,6 +338,8 @@ export function UploadExcelForm() {
             cantidadDisponible: info.cantidad,
             estado: info.estado,
             motivoVerificar: info.motivo ?? null,
+            saldoActual: info.saldoActual ?? null,
+            reserva: info.reserva ?? null,
             porBodega: info.porBodega,
             ultimaActualizacion: serverTimestamp(),
           },
