@@ -20,15 +20,26 @@ function bodegasDe(bodega: string): string[] {
 }
 
 /**
- * Cuando hay bodegas filtradas, muestra solo lo que hay en esas bodegas (texto y cantidad) en
+ * Cuando hay bodegas filtradas, muestra solo esa(s) bodega(s) y lo que hay realmente ahí, en
  * vez del total combinado entre todas. El despacho real sigue descontando del total — Teo no
  * reserva stock por bodega — por eso no se usa esto para habilitar/deshabilitar "Despachar".
+ *
+ * El texto de bodega se puede acotar siempre (solo depende de la lista de bodegas del ítem).
+ * La cantidad por bodega solo existe si la referencia se cargó después de que se guardara el
+ * desglose (`porBodega`) — si no, se avisa en vez de mostrar el total combinado por error.
  */
 function vistaFiltrada(item: StockItem, bodegasActivas: string[]) {
-  if (bodegasActivas.length === 0 || !item.porBodega) {
-    return { bodegaTexto: item.bodega, cantidad: item.cantidadDisponible, estado: item.estado }
+  if (bodegasActivas.length === 0) {
+    return { bodegaTexto: item.bodega, cantidad: item.cantidadDisponible, estado: item.estado, sinDesglose: false }
   }
+
   const incluidas = bodegasDe(item.bodega).filter((b) => bodegasActivas.includes(b))
+  const bodegaTexto = incluidas.join(', ') || item.bodega
+
+  if (!item.porBodega) {
+    return { bodegaTexto, cantidad: 0, estado: item.estado, sinDesglose: true }
+  }
+
   let cantidad = 0
   let estado: EstadoStock = 'ok'
   for (const b of incluidas) {
@@ -37,7 +48,7 @@ function vistaFiltrada(item: StockItem, bodegasActivas: string[]) {
     cantidad += info.cantidad
     if (info.estado === 'por_verificar') estado = 'por_verificar'
   }
-  return { bodegaTexto: incluidas.join(', ') || item.bodega, cantidad, estado }
+  return { bodegaTexto, cantidad, estado, sinDesglose: false }
 }
 
 export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
@@ -201,14 +212,26 @@ export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
                     <td>{item.producto}</td>
                     <td>{vista.bodegaTexto || '—'}</td>
                     <td>
-                      {vista.cantidad} {item.unidad}
+                      {vista.sinDesglose ? (
+                        <span title="Esta referencia se cargó antes de que se guardara la cantidad por bodega. Vuelve a cargar el Excel para verla.">
+                          — (recarga el Excel)
+                        </span>
+                      ) : (
+                        <>
+                          {vista.cantidad} {item.unidad}
+                        </>
+                      )}
                     </td>
                     <td>
-                      <span className={`insignia insignia-${dispVista.tipo}`} title={dispVista.mensaje}>
-                        {dispVista.tipo === 'disponible' && 'Disponible'}
-                        {dispVista.tipo === 'sin_stock' && 'Sin stock — producir'}
-                        {dispVista.tipo === 'por_verificar' && 'Por verificar'}
-                      </span>
+                      {vista.sinDesglose ? (
+                        <span className="insignia insignia-por_verificar">Sin desglose</span>
+                      ) : (
+                        <span className={`insignia insignia-${dispVista.tipo}`} title={dispVista.mensaje}>
+                          {dispVista.tipo === 'disponible' && 'Disponible'}
+                          {dispVista.tipo === 'sin_stock' && 'Sin stock — producir'}
+                          {dispVista.tipo === 'por_verificar' && 'Por verificar'}
+                        </span>
+                      )}
                     </td>
                     {permiteDespacho && (
                       <td>
