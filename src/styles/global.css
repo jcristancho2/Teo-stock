@@ -158,6 +158,14 @@ select {
   color: var(--color-texto);
 }
 
+input:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-primario) 40%, transparent);
+  outline-offset: 2px;
+}
+
 button {
   background: var(--color-primario);
   color: white;
@@ -336,13 +344,72 @@ button:disabled {
   gap: 1rem;
 }
 
+.inventario-encabezado {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.inventario-encabezado h2 {
+  margin-bottom: 0.25rem;
+}
+
+.inventario-encabezado .texto-ayuda {
+  margin: 0;
+}
+
+.sobrelinea {
+  margin: 0 0 0.2rem;
+  color: var(--color-primario);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.contador-resultados {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  background: var(--color-primario-claro);
+  color: var(--color-primario-oscuro);
+  padding: 0.38rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.busqueda-inventario {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
 .buscador {
-  width: 280px;
+  width: min(100%, 460px);
+  min-height: 44px;
   border-radius: 999px;
   padding-left: 2.25rem;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b6f7a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: 0.8rem center;
+}
+
+.boton-limpiar-filtros {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0.45rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--color-borde);
+  color: var(--color-texto);
+  font-size: 0.82rem;
+}
+
+.boton-limpiar-filtros:hover:not(:disabled) {
+  background: var(--color-fondo);
 }
 
 .grupo-filtro {
@@ -369,6 +436,7 @@ button:disabled {
   border: 1px solid var(--color-borde);
   color: var(--color-texto-suave);
   border-radius: 999px;
+  min-height: 36px;
   padding: 0.3rem 0.75rem;
   font-size: 0.8rem;
   cursor: pointer;
@@ -416,6 +484,23 @@ button:disabled {
   font-weight: 600;
   font-size: 0.8rem;
   text-transform: uppercase;
+}
+
+.tabla tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.tabla tbody tr:hover {
+  background: color-mix(in srgb, var(--color-primario-claro) 45%, transparent);
+}
+
+.estado-inventario {
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--color-texto-suave);
+  font-size: 0.92rem;
 }
 
 .insignia {
@@ -619,7 +704,21 @@ button:disabled {
     align-items: stretch;
   }
 
+  .inventario-encabezado {
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .busqueda-inventario {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .buscador {
+    width: 100%;
+  }
+
+  .boton-limpiar-filtros {
     width: 100%;
   }
 
@@ -663,6 +762,10 @@ button:disabled {
     border-radius: 12px;
     padding: 0.75rem 0.9rem;
     box-shadow: 0 1px 2px rgba(20, 22, 30, 0.04);
+  }
+
+  .tabla tbody tr:hover {
+    background: var(--color-tarjeta);
   }
 
   .tabla td {

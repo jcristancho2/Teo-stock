@@ -64,6 +64,8 @@ function vistaFiltrada(item: StockItem, bodegasActivas: string[]) {
 
 export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
   const [items, setItems] = useState<StockItem[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [errorCarga, setErrorCarga] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [prefijosActivos, setPrefijosActivos] = useState<string[]>([])
   const [bodegasActivas, setBodegasActivas] = useState<string[]>([])
@@ -71,9 +73,18 @@ export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
 
   useEffect(() => {
     const q = query(collection(db, 'stock'), orderBy('producto'))
-    const unsub = onSnapshot(q, (snap) => {
-      setItems(snap.docs.map((d) => d.data() as StockItem))
-    })
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setItems(snap.docs.map((d) => d.data() as StockItem))
+        setCargando(false)
+        setErrorCarga('')
+      },
+      () => {
+        setCargando(false)
+        setErrorCarga('No fue posible cargar el inventario. Actualiza la página e inténtalo de nuevo.')
+      }
+    )
     return unsub
   }, [])
 
@@ -124,17 +135,43 @@ export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
     })
   }, [items, busqueda, prefijosActivos, bodegasActivas])
 
+  const hayFiltrosActivos = Boolean(busqueda.trim() || prefijosActivos.length || bodegasActivas.length)
+
+  function limpiarFiltros() {
+    setBusqueda('')
+    setPrefijosActivos([])
+    setBodegasActivas([])
+  }
+
   return (
     <div className="tarjeta">
-      <div className="fila-cabecera">
-        <h2>Disponibilidad</h2>
+      <div className="inventario-encabezado">
+        <div>
+          <p className="sobrelinea">Inventario</p>
+          <h2>Consulta de disponibilidad</h2>
+          <p className="texto-ayuda">Busca una referencia y confirma el stock disponible para tu cliente.</p>
+        </div>
+        {!cargando && !errorCarga && (
+          <span className="contador-resultados" aria-live="polite">
+            {filtrados.length} {filtrados.length === 1 ? 'referencia' : 'referencias'}
+          </span>
+        )}
+      </div>
+
+      <div className="busqueda-inventario">
         <input
           type="search"
+          aria-label="Buscar por referencia o producto"
           placeholder="Buscar por referencia o producto…"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           className="buscador"
         />
+        {hayFiltrosActivos && (
+          <button type="button" className="boton-limpiar-filtros" onClick={limpiarFiltros}>
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       {prefijosDisponibles.length > 1 && (
@@ -193,7 +230,11 @@ export function StockTable({ permiteDespacho }: { permiteDespacho: boolean }) {
         </div>
       )}
 
-      {items.length === 0 ? (
+      {cargando ? (
+        <p className="estado-inventario" role="status">Cargando inventario…</p>
+      ) : errorCarga ? (
+        <p className="texto-error" role="alert">{errorCarga}</p>
+      ) : items.length === 0 ? (
         <p className="texto-ayuda">
           Todavía no hay ningún Excel cargado. Pide a un administrador que cargue el de hoy.
         </p>
