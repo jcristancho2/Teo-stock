@@ -1,29 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
-import { app, db } from '../firebase/config'
+import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { db } from '../firebase/config'
 import { useAuth } from '../context/AuthContext'
 import type { Rol, UsuarioPerfil } from '../types'
 
-/** Traduce los códigos de error de la API de Identity Toolkit a algo que el admin entienda. */
-function mensajeErrorAuth(codigo: string | undefined): string {
-  if (codigo?.startsWith('EMAIL_EXISTS')) {
-    // "Eliminar" en este panel solo borra el perfil de Firestore (el navegador no puede borrar
-    // la cuenta de Authentication de otra persona sin Admin SDK) — si ese correo se eliminó
-    // antes, la cuenta sigue viva y "crear" vuelve a chocar con ella. Hace falta el script local.
-    return (
-      'Ese correo ya tiene cuenta en Authentication — probablemente de un usuario que eliminaste ' +
-      'antes (Eliminar solo borra el perfil, no la cuenta). Para reutilizarlo corre en terminal: ' +
-      'FIREBASE_SERVICE_ACCOUNT=./service-account.json node scripts/eliminarUsuario.cjs ' +
-      '<correo> — eso sí libera el correo del todo.'
-    )
-  }
-  if (codigo?.startsWith('WEAK_PASSWORD')) return 'La contraseña debe tener al menos 6 caracteres.'
-  if (codigo?.startsWith('INVALID_EMAIL')) return 'El correo no es válido.'
-  return 'No se pudo crear el usuario en Firebase Authentication.'
-}
+// Backend mínimo con Admin SDK (ver server/), desplegado aparte en Render: crea/elimina
+// cuentas de Authentication de verdad, algo que el navegador no puede hacer solo. Suple a las
+// Cloud Functions del repo, que no pueden desplegar en el plan Spark de Firebase.
+const URL_API_ADMIN = import.meta.env.VITE_ADMIN_API_URL || 'https://teo-stock-admin-api.onrender.com'
 
 export function AdminUsersPage() {
-  const { perfil: perfilPropio } = useAuth()
+  const { perfil: perfilPropio, usuarioAuth } = useAuth()
   const [usuarios, setUsuarios] = useState<UsuarioPerfil[]>([])
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
@@ -47,31 +34,17 @@ export function AdminUsersPage() {
     setExito(null)
     setEnviando(true)
     try {
-      // Se crea la cuenta llamando directo a la API de Identity Toolkit (REST), no con el SDK
-      // de cliente: el SDK, al crear un usuario, deja la sesión del navegador logueada como ESE
-      // usuario nuevo (saca al admin). La llamada REST solo crea la cuenta en Auth y no toca la
-      // sesión actual. No hace falta Cloud Function ni Admin SDK — por eso funciona en plan
-      // gratis. El permiso real lo da el doc de Firestore que se escribe después, no esta cuenta.
-      const respuesta = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${app.options.apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), password, displayName: nombre.trim() }),
-        }
-      )
-      const datos = await respuesta.json()
-      if (!respuesta.ok) {
-        throw new Error(mensajeErrorAuth(datos.error?.message))
-      }
-
-      await setDoc(doc(db, 'users', datos.localId), {
-        email: email.trim(),
-        nombre: nombre.trim(),
-        rol,
-        activo: true,
-        creadoEn: serverTimestamp(),
+      if (!usuarioAuth) throw new Error('Sesión no válida.')
+      const token = await usuarioAuth.getIdToken()
+      const respuesta = await fetch(`${URL_API_ADMIN}/usuarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email: email.trim(), password, nombre: nombre.trim(), rol }),
       })
+      const datos = await respuesta.json().catch(() => ({}))
+      if (!respuesta.ok) {
+        throw new Error(datos.error ?? 'No se pudo crear el usuario.')
+      }
 
       setExito(`Usuario ${nombre} creado correctamente.`)
       setNombre('')
@@ -93,12 +66,26 @@ export function AdminUsersPage() {
     await updateDoc(doc(db, 'users', usuario.uid), { rol: nuevoRol })
   }
 
-  // Elimina el perfil de Firestore (no la cuenta de Authentication en sí, que el cliente no
-  // puede borrar sin Admin SDK). Sin ese perfil, la persona pierde todo acceso a la app de
-  // inmediato — las reglas de Firestore y RoleRoute lo bloquean igual que si no existiera.
+  // Elimina de verdad: la cuenta de Firebase Authentication Y el perfil de Firestore, vía el
+  // backend con Admin SDK (el navegador no puede borrar la cuenta de otra persona él solo).
   async function eliminarUsuario(usuario: UsuarioPerfil) {
-    await deleteDoc(doc(db, 'users', usuario.uid))
-    setUidAEliminar(null)
+    setError(null)
+    try {
+      if (!usuarioAuth) throw new Error('Sesión no válida.')
+      const token = await usuarioAuth.getIdToken()
+      const respuesta = await fetch(`${URL_API_ADMIN}/usuarios/${usuario.uid}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!respuesta.ok) {
+        const datos = await respuesta.json().catch(() => ({}))
+        throw new Error(datos.error ?? 'No se pudo eliminar el usuario.')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar el usuario.')
+    } finally {
+      setUidAEliminar(null)
+    }
   }
 
   return (
@@ -142,10 +129,8 @@ export function AdminUsersPage() {
       <div className="tarjeta">
         <h2>Usuarios del sistema</h2>
         <p className="texto-ayuda">
-          "Eliminar" quita el acceso de inmediato, pero solo borra el perfil — la cuenta de
-          Authentication queda viva. Si vas a reutilizar ese correo para crear otro usuario,
-          libéralo primero corriendo en terminal: FIREBASE_SERVICE_ACCOUNT=./service-account.json
-          node scripts/eliminarUsuario.cjs &lt;correo&gt;
+          "Eliminar" borra la cuenta de verdad (Authentication y perfil) — el correo queda libre
+          para crear un usuario nuevo de inmediato.
         </p>
         <div className="tabla-contenedor">
           <table className="tabla">

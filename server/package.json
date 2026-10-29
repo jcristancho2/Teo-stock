@@ -1,0 +1,15 @@
+{
+  "name": "teo-stock-admin-api",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Backend mínimo (Admin SDK) para crear/eliminar usuarios de Teo. Suple a Cloud Functions, que no pueden desplegar en el plan Spark de Firebase.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "firebase-admin": "^14.5.0"
+  }
+}
