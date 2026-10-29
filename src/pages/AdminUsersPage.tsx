@@ -6,7 +6,17 @@ import type { Rol, UsuarioPerfil } from '../types'
 
 /** Traduce los códigos de error de la API de Identity Toolkit a algo que el admin entienda. */
 function mensajeErrorAuth(codigo: string | undefined): string {
-  if (codigo?.startsWith('EMAIL_EXISTS')) return 'Ya existe un usuario con ese correo.'
+  if (codigo?.startsWith('EMAIL_EXISTS')) {
+    // "Eliminar" en este panel solo borra el perfil de Firestore (el navegador no puede borrar
+    // la cuenta de Authentication de otra persona sin Admin SDK) — si ese correo se eliminó
+    // antes, la cuenta sigue viva y "crear" vuelve a chocar con ella. Hace falta el script local.
+    return (
+      'Ese correo ya tiene cuenta en Authentication — probablemente de un usuario que eliminaste ' +
+      'antes (Eliminar solo borra el perfil, no la cuenta). Para reutilizarlo corre en terminal: ' +
+      'FIREBASE_SERVICE_ACCOUNT=./service-account.json node scripts/eliminarUsuario.cjs ' +
+      '<correo> — eso sí libera el correo del todo.'
+    )
+  }
   if (codigo?.startsWith('WEAK_PASSWORD')) return 'La contraseña debe tener al menos 6 caracteres.'
   if (codigo?.startsWith('INVALID_EMAIL')) return 'El correo no es válido.'
   return 'No se pudo crear el usuario en Firebase Authentication.'
@@ -131,6 +141,12 @@ export function AdminUsersPage() {
 
       <div className="tarjeta">
         <h2>Usuarios del sistema</h2>
+        <p className="texto-ayuda">
+          "Eliminar" quita el acceso de inmediato, pero solo borra el perfil — la cuenta de
+          Authentication queda viva. Si vas a reutilizar ese correo para crear otro usuario,
+          libéralo primero corriendo en terminal: FIREBASE_SERVICE_ACCOUNT=./service-account.json
+          node scripts/eliminarUsuario.cjs &lt;correo&gt;
+        </p>
         <div className="tabla-contenedor">
           <table className="tabla">
             <thead>
