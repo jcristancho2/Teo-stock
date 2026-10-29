@@ -63,16 +63,48 @@ app.get('/', (_req, res) => {
   res.json({ ok: true, servicio: 'teo-stock-admin-api' })
 })
 
+/**
+ * Login solo con correo, decisión explícita del cliente: sin contraseña, sin enlace ni código
+ * de verificación — si el correo coincide con una cuenta activa (creada por un admin), entra.
+ * ADVERTENCIA DE SEGURIDAD aceptada a propósito: cualquiera que sepa el correo de un compañero
+ * puede entrar como él. Esto SÍ importa porque los despachos y cargas de Excel quedan firmados
+ * con el nombre de quien los hizo — con este login, esa firma deja de ser confiable. Para
+ * revertir, hay que exigir algún paso de verificación (enlace al correo, código, contraseña).
+ */
+app.post('/iniciar-sesion', async (req, res) => {
+  const { email } = req.body ?? {}
+  if (!email) return res.status(400).json({ error: 'Falta el correo.' })
+
+  try {
+    const usuario = await auth.getUserByEmail(String(email).trim())
+    const perfil = await db.collection('users').doc(usuario.uid).get()
+    if (!perfil.exists || perfil.data().activo !== true) {
+      return res.status(403).json({ error: 'No hay una cuenta activa con ese correo. Pide a un administrador que te registre.' })
+    }
+
+    const token = await auth.createCustomToken(usuario.uid)
+    res.json({ token })
+  } catch (err) {
+    if (err.code === 'auth/user-not-found') {
+      return res.status(404).json({ error: 'No existe una cuenta con ese correo. Pide a un administrador que te registre.' })
+    }
+    console.error('Error iniciando sesión:', err)
+    res.status(500).json({ error: 'No se pudo iniciar sesión.' })
+  }
+})
+
 app.post('/usuarios', exigirAdmin, async (req, res) => {
-  const { email, password, nombre, rol } = req.body ?? {}
-  if (!email || !password || !nombre || (rol !== 'admin' && rol !== 'comercial')) {
+  const { email, nombre, rol } = req.body ?? {}
+  if (!email || !nombre || (rol !== 'admin' && rol !== 'comercial')) {
     return res.status(400).json({ error: 'Faltan datos o el rol no es válido.' })
   }
 
   try {
+    // Sin contraseña a propósito: el login de Teo es solo con correo (ver /iniciar-sesion), la
+    // cuenta de Authentication solo existe para tener un uid estable al que atar el perfil.
     let usuario
     try {
-      usuario = await auth.createUser({ email, password, displayName: nombre })
+      usuario = await auth.createUser({ email, displayName: nombre })
     } catch (err) {
       if (err.code !== 'auth/email-already-exists') throw err
 
@@ -85,7 +117,7 @@ app.post('/usuarios', exigirAdmin, async (req, res) => {
         return res.status(409).json({ error: 'Ese correo ya está en uso por un usuario del sistema.' })
       }
       await auth.deleteUser(existente.uid)
-      usuario = await auth.createUser({ email, password, displayName: nombre })
+      usuario = await auth.createUser({ email, displayName: nombre })
     }
 
     await db.collection('users').doc(usuario.uid).set({

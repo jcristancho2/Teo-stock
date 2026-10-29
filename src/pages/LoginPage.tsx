@@ -1,20 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { signInWithEmailAndPassword } from 'firebase/auth'
+import { signInWithCustomToken } from 'firebase/auth'
 import { auth } from '../firebase/config'
+import { URL_API_ADMIN } from '../config/adminApi'
 import { BotonTema } from '../components/BotonTema'
-
-const MENSAJES_ERROR: Record<string, string> = {
-  'auth/invalid-email': 'El correo no es válido.',
-  'auth/invalid-credential': 'Correo o contraseña incorrectos.',
-  'auth/wrong-password': 'Correo o contraseña incorrectos.',
-  'auth/user-not-found': 'No existe una cuenta con ese correo.',
-  'auth/too-many-requests': 'Demasiados intentos. Espera unos minutos e intenta de nuevo.',
-}
 
 export function LoginPage() {
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   const navigate = useNavigate()
@@ -25,11 +17,23 @@ export function LoginPage() {
     setError(null)
     setEnviando(true)
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password)
+      // Login solo con correo, sin contraseña: el backend revisa que el correo tenga una cuenta
+      // activa (creada por un admin) y entrega un custom token para esa cuenta. Decisión
+      // explícita del cliente — ver la advertencia de seguridad en server/index.js.
+      const respuesta = await fetch(`${URL_API_ADMIN}/iniciar-sesion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      })
+      const datos = await respuesta.json().catch(() => ({}))
+      if (!respuesta.ok) {
+        throw new Error(datos.error ?? 'No se pudo iniciar sesión.')
+      }
+
+      await signInWithCustomToken(auth, datos.token)
       navigate(location.state?.from?.pathname ?? '/', { replace: true })
     } catch (err) {
-      const codigo = (err as { code?: string }).code ?? ''
-      setError(MENSAJES_ERROR[codigo] ?? 'No se pudo iniciar sesión. Intenta de nuevo.')
+      setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión. Intenta de nuevo.')
     } finally {
       setEnviando(false)
     }
@@ -52,17 +56,6 @@ export function LoginPage() {
             autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </label>
-
-        <label>
-          Contraseña
-          <input
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
             required
           />
         </label>

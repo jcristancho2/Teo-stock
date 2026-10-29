@@ -2,19 +2,14 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { useAuth } from '../context/AuthContext'
+import { URL_API_ADMIN } from '../config/adminApi'
 import type { Rol, UsuarioPerfil } from '../types'
-
-// Backend mínimo con Admin SDK (ver server/), desplegado aparte en Render: crea/elimina
-// cuentas de Authentication de verdad, algo que el navegador no puede hacer solo. Suple a las
-// Cloud Functions del repo, que no pueden desplegar en el plan Spark de Firebase.
-const URL_API_ADMIN = import.meta.env.VITE_ADMIN_API_URL || 'https://teo-stock-admin-api.onrender.com'
 
 export function AdminUsersPage() {
   const { perfil: perfilPropio, usuarioAuth } = useAuth()
   const [usuarios, setUsuarios] = useState<UsuarioPerfil[]>([])
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [rol, setRol] = useState<Rol>('comercial')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,7 +34,7 @@ export function AdminUsersPage() {
       const respuesta = await fetch(`${URL_API_ADMIN}/usuarios`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ email: email.trim(), password, nombre: nombre.trim(), rol }),
+        body: JSON.stringify({ email: email.trim(), nombre: nombre.trim(), rol }),
       })
       const datos = await respuesta.json().catch(() => ({}))
       if (!respuesta.ok) {
@@ -49,7 +44,6 @@ export function AdminUsersPage() {
       setExito(`Usuario ${nombre} creado correctamente.`)
       setNombre('')
       setEmail('')
-      setPassword('')
       setRol('comercial')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo crear el usuario.')
@@ -100,16 +94,6 @@ export function AdminUsersPage() {
           <label>
             Correo
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </label>
-          <label>
-            Contraseña inicial
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={6}
-              required
-            />
           </label>
           <label>
             Rol
