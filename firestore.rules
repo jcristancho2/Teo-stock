@@ -3,14 +3,26 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // El rol/activo vive en el doc propio de /users — nunca en un custom claim. Esto es a
+    // propósito: setear custom claims requiere Admin SDK (Cloud Function o script local), que
+    // en plan Spark no se puede desplegar. Leyendo el doc propio, admin puede crear/activar/
+    // desactivar/eliminar usuarios 100% desde el panel, sin backend privilegiado.
+    // Sigue siendo seguro contra auto-escalado: para escribir CUALQUIER /users/{id} (incluido
+    // el propio) hace falta que el doc propio YA diga rol == 'admin' — un comercial no puede
+    // promoverse a sí mismo porque la condición se evalúa contra lo que ya está guardado, no
+    // contra lo que intenta escribir.
     function estaAutenticado() {
       return request.auth != null;
     }
+    function perfilPropio() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
     function esAdmin() {
-      return estaAutenticado() && request.auth.token.role == 'admin';
+      return estaAutenticado() && perfilPropio().rol == 'admin' && perfilPropio().activo == true;
     }
     function esComercialOAdmin() {
-      return estaAutenticado() && (request.auth.token.role == 'comercial' || request.auth.token.role == 'admin');
+      return estaAutenticado() && perfilPropio().activo == true
+        && (perfilPropio().rol == 'comercial' || perfilPropio().rol == 'admin');
     }
 
     // Perfiles de usuario (rol, nombre, activo). Cada persona puede leer el
